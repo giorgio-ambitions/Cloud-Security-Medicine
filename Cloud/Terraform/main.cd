@@ -1,0 +1,81 @@
+⭐ Overall assessment
+
+The code is well structured for a mature CLI entry point. realMain() is long, but it is primarily coordinating Terraform's startup and execution flow, so I would avoid a large refactor.
+
+The best improvements are focused on testing, security, and lifecycle behavior.
+
+Main recommendations
+
+1. Add tests for mergeEnvArgs() — High priority
+
+Test:
+
+TF_CLI_ARGS
+command-specific arguments
+quoted values
+malformed shell syntax
+subcommands
+argument ordering
+
+This protects Terraform's CLI behavior.
+
+2. Add tests for extractChdirOption() — High priority
+
+Test:
+
+-chdir=foo
+missing =
+empty paths
+-chdir before vs. after the subcommand
+multiple -chdir options
+preservation of argument order
+
+3. Review sensitive data in logging — Medium priority
+
+This line:
+
+log.Printf("[INFO] CLI args: %#v", os.Args)
+
+could potentially log sensitive values supplied through command-line arguments. The OpenTelemetry span name also includes the command arguments.
+
+I'd investigate whether these values should be redacted.
+
+4. Verify checkpoint cancellation — Medium priority
+
+The code starts:
+
+go runCheckpoint(ctx, config)
+
+Confirm that runCheckpoint respects context cancellation and add a lifecycle test if needed.
+
+5. Don't refactor realMain() aggressively
+
+I wouldn't split every initialization step into separate functions. The current structure makes the CLI startup sequence relatively easy to follow.
+
+One possible issue
+
+Your pasted code contains:
+
+overrideWd, args, err := extractChdirOption(arg)
+
+but the variable appears to be:
+
+args := os.Args[1:]
+
+If arg isn't defined elsewhere, this is a compile error and should be:
+
+overrideWd, args, err := extractChdirOption(args)
+
+If that's just a copy/paste mistake, ignore it.
+
+Recommended PR review
+
+Overall: Good, idiomatic orchestration code. I wouldn't recommend a broad refactor of realMain().
+
+Recommended improvements:
+
+Add table-driven tests for mergeEnvArgs().
+Add comprehensive tests for extractChdirOption(), especially option ordering.
+Review whether CLI arguments should be logged or included verbatim in telemetry, since they may contain sensitive values.
+Verify that the checkpoint goroutine terminates correctly through context cancellation.
+Keep the existing initialization structure unless a concrete maintainability problem justifies extraction.
